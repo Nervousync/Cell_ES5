@@ -15,8 +15,13 @@
  * limitations under the License.
  */
 /*
+ *
+ * 1.0.1
+ * [New] Extend String for Verify CHN ID Card Code and CHN Social Credit Code
+ *
  * 1.0.0
  * [New] Extend Element/String/Number/Array/Date
+ *
  */
 var BASE64 = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -28,8 +33,13 @@ var BASE64 = [
 
 var BASE16 = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
+var CHN_SOCIAL_CREDIT_CODE = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F',
+    'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'W', 'X', 'Y'
+];
+
 var Comment = {
-    Version:    "1.0.0",
+    Version:    "1.0.1",
     Language:   (navigator.language|| navigator.userLanguage).substring(0, 2),
     Html5:      !!window.applicationCache,
     MaxWidth :  Math.max(document.documentElement.scrollWidth, document.documentElement.clientWidth),
@@ -89,7 +99,9 @@ var RegexLibrary = {
     Color : /^#[0-9A-F]{6}$/i,
     XML : /<[a-zA-Z0-9]+[^>]*>(?:.|[\r\n])*?<\/[a-zA-Z0-9]+>/ig,
     HtmlTag : /<[a-zA-Z0-9]+[^>]*>/ig,
-    Date: /^((((19|20)\d{2})-(0?(1|[3-9])|1[012])-(0?[1-9]|[12]\d|30))|(((19|20)\d{2})-(0?[13578]|1[02])-31)|(((19|20)\d{2})-0?2-(0?[1-9]|1\d|2[0-8]))|((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))-0?2-29))$/ig
+    Date: /^((((19|20)\d{2})-(0?(1|[3-9])|1[012])-(0?[1-9]|[12]\d|30))|(((19|20)\d{2})-(0?[13578]|1[02])-31)|(((19|20)\d{2})-0?2-(0?[1-9]|1\d|2[0-8]))|((((19|20)([13579][26]|[2468][048]|0[48]))|(2000))-0?2-29))$/ig,
+    CHN_ID_Card : /^[1-9]([0-9]{17}|([0-9]{16}X))$/g,
+    CHN_Social_Credit : /^([1-9]|A|N|Y)[0-9A-Z]{17}$/g
 };
 
 Object.extend = function(destination, source) {
@@ -218,24 +230,32 @@ Object.extend(Element.prototype, {
         if (this.tagName.toLowerCase() === "form") {
             var _formData = new FormData();
             _formData.uploadFile = false;
-            var _nodeList = this.querySelectorAll("input"), _length = _nodeList.length, _inputName, _inputValue;
+            var _nodeList = this.querySelectorAll("input, select, textarea"),
+                _length = _nodeList.length, _element, _inputName, _inputValue;
             for (var i = 0 ; i < _length ; i++) {
-                _inputName = _nodeList[i].name;
-                _inputValue = _nodeList[i].value;
-                switch (_nodeList[i].type.toLowerCase()) {
-                    case "password":
-                        _inputValue = Cell.encryptPassword(_inputValue);
-                        break;
-                    case "date":
-                    case "datetime-local":
-                        _inputValue = Cell.convertDateTime(_inputValue);
-                        break;
-                    case "file":
-                        _formData.uploadFile = true;
-                        break;
-                }
-                if (_inputValue != null) {
-                    _formData.append(_inputName, _inputValue);
+                _element = _nodeList[i];
+                _inputName = _element.name;
+                _inputValue = _element.tagName.toLowerCase() === "textarea" ? _element.innerHTML : _element.value;
+                if (_inputValue !== null && _inputValue.length > 0) {
+                    if (_element.tagName.toLowerCase() === "input") {
+                        switch (_element.type.toLowerCase()) {
+                            case "password":
+                                _inputValue = Cell.encryptPassword(_inputValue);
+                                break;
+                            case "date":
+                            case "datetime-local":
+                                _inputValue = Cell.convertDateTime(_inputValue);
+                                break;
+                            case "file":
+                                _formData.uploadFile = true;
+                                break;
+                        }
+                        _formData.append(_inputName, _inputValue);
+                    } else if (_element.tagName.toLowerCase() === "select") {
+                        _formData.append(_inputName, _inputValue);
+                    } else {
+                        _formData.append(_inputName, _inputValue.encodeByRegExp());
+                    }
                 }
             }
             return _formData;
@@ -243,29 +263,41 @@ Object.extend(Element.prototype, {
     },
 
     validate : function() {
-        if (this.tagName.toLowerCase() === "input"
-            || this.tagName.toLowerCase() === "select") {
-            var _result = true;
-            if (this.hasAttribute("value")) {
-                var _value = this.getAttribute("value");
+        var _result = true;
+        if (this.tagName.toLowerCase() === "form") {
+            var _elementList = this.querySelectorAll("input, select, textarea"), _length = _elementList.length, i;
+            for ( i = 0 ; i < _length ; i++) {
+                _result = _result && _elementList[i].validate();
+            }
+        } else if (this.dataset.validate === "true"
+            && (this.tagName.toLowerCase() === "input" || this.tagName.toLowerCase() === "select")) {
+            if (this.value.length > 0) {
+                var _value = this.value;
                 if (this.dataset.regex) {
-                    _result &= (_value.match(this.dataset.regex) !== null);
+                    _result = _result && (_value.match(this.dataset.regex) !== null);
                 }
                 if (this.dataset.minValue && this.dataset.minValue.isNum() && _value.isNum()) {
-                    _result &= (Number(this.dataset.minValue) <= Number(_value));
+                    _result = _result && (Number(this.dataset.minValue) <= Number(_value));
                 }
                 if (this.dataset.maxValue && this.dataset.maxValue.isNum() && _value.isNum()) {
-                    _result &= (Number(_value) <= Number(this.dataset.maxValue));
+                    _result = _result && (Number(_value) <= Number(this.dataset.maxValue));
                 }
                 if (this.dataset.email === "true") {
-                    _result &= _value.isEmail();
+                    _result = _result && _value.isEmail();
+                }
+                if (this.dataset.idCard === "true") {
+                    _result = _result && _value.isIDCardCode();
+                }
+                if (this.dataset.socialCredit === "true") {
+                    _result = _result && _value.isSocialCreditCode();
                 }
             } else {
-                _result = (this.dataset.notNull === "false");
+                _result = this.dataset.notNull === undefined || this.dataset.notNull === "false";
             }
 
-            this.dataset.validate = _result.toString();
+            this.dataset.verifyResult = _result.toString();
         }
+        return _result;
     },
 
     sortChildrenBy : function(tagName, attributeName, _sortDesc) {
@@ -405,7 +437,7 @@ Object.extend(String.prototype, {
     },
 
     isEmail : function() {
-        return RegexLibrary.E_Mail.test(this);
+        return RegexLibrary.E_Mail.test(this.cleanBlank());
     },
 
     isJSON : function() {
@@ -430,12 +462,42 @@ Object.extend(String.prototype, {
         return eval('(' + this + ')');
     },
 
+    isIDCardCode : function() {
+        if (this.trim().search(RegexLibrary.CHN_ID_Card) !== -1) {
+            var _sigma = 0, _code, i;
+            for (i = 0 ; i < 17 ; i++) {
+                _code = this.charAt(i).parseInt();
+                if (_code !== 0) {
+                    _sigma += _code * (Math.pow(2, 17 - i) % 11);
+                }
+            }
+            var _authCode = (12 - (_sigma % 11)) % 11;
+            return (_authCode === 10) ? this.toUpperCase().endsWith("X") : (this.charAt(17).parseInt() === _authCode);
+        }
+        return false;
+    },
+
+    isSocialCreditCode : function() {
+        if (this.trim().search(RegexLibrary.CHN_Social_Credit) !== -1) {
+            var _sigma = 0, _validateCode = CHN_SOCIAL_CREDIT_CODE.indexOf(this.charAt(17)),_code, i;
+            for (i = 0 ; i < 17 ; i++) {
+                _code = CHN_SOCIAL_CREDIT_CODE.indexOf(this.charAt(i));
+                if (_code !== 0) {
+                    _sigma += _code * (Math.pow(3, i) % 31);
+                }
+            }
+            var _authCode = 31 - (_sigma % 31);
+            return (_authCode === 31) ? (_validateCode === 0) : (_authCode === _validateCode);
+        }
+        return false;
+    },
+
     isColorCode : function() {
-        return RegexLibrary.Color.test(this);
+        return this.trim().search(RegexLibrary.Color) !== -1;
     },
 
     isXml : function() {
-        return RegexLibrary.XML.test(this.trim());
+        return this.trim().search(RegexLibrary.XML) !== -1;
     },
 
     isHtml : function() {
@@ -500,7 +562,7 @@ Object.extend(String.prototype, {
     },
 
     isNum : function() {
-        return (this.match(RegexLibrary.Number) != null);
+        return (this.trim().search(RegexLibrary.Number) !== -1);
     },
 
     parseInt : function(radix) {

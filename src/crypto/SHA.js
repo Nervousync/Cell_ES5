@@ -579,10 +579,7 @@ SHA1.prototype = {
     }
 };
 Object.extend(SHA1.prototype, operator);
-SHA1.newInstance = function() {
-    return new SHA1();
-};
-SHA1.HmacSHA1 = function(key) {
+SHA1.newInstance = function(key) {
     return new SHA1(key);
 };
 
@@ -593,11 +590,8 @@ SHA224.prototype = {
     }
 };
 Object.extend(SHA224.prototype, operator);
-SHA224.newInstance = function() {
-    return new SHA224();
-};
-SHA224.HmacSHA224 = function(key) {
-    return new SHA224(224, key);
+SHA224.newInstance = function(key) {
+    return new SHA224(key);
 };
 
 var SHA256 = Class.create();
@@ -607,10 +601,7 @@ SHA256.prototype = {
     }
 };
 Object.extend(SHA256.prototype, operator);
-SHA256.newInstance = function() {
-    return new SHA256(256);
-};
-SHA256.HmacSHA256 = function(key) {
+SHA256.newInstance = function(key) {
     return new SHA256(256, key);
 };
 
@@ -621,11 +612,8 @@ SHA384.prototype = {
     }
 };
 Object.extend(SHA384.prototype, operator);
-SHA384.newInstance = function() {
-    return new SHA384();
-};
-SHA384.HmacSHA384 = function(key) {
-    return new SHA384(384, key);
+SHA384.newInstance = function(key) {
+    return new SHA384(key);
 };
 
 var SHA512 = Class.create();
@@ -635,22 +623,13 @@ SHA512.prototype = {
     }
 };
 Object.extend(SHA512.prototype, operator);
-SHA512.newInstance = function() {
-    return new SHA512(512);
-};
-SHA512.SHA512_224 = function() {
-    return new SHA512(224);
-};
-SHA512.SHA512_256 = function() {
-    return new SHA512(256);
-};
-SHA512.HmacSHA512 = function(key) {
+SHA512.newInstance = function(key) {
     return new SHA512(512, key);
 };
-SHA512.HmacSHA512_224 = function(key) {
+SHA512.SHA512_224 = function(key) {
     return new SHA512(224, key);
 };
-SHA512.HmacSHA512_256 = function(key) {
+SHA512.SHA512_256 = function(key) {
     return new SHA512(256, key);
 };
 
@@ -694,11 +673,18 @@ SHA3.SHAKE256 = function(outBit) {
 
 (function () {
     if (typeof Cell !== "undefined") {
-        Cell.SHA1 = SHA1;
-        Cell.SHA224 = SHA224;
-        Cell.SHA256 = SHA256;
-        Cell.SHA384 = SHA384;
-        Cell.SHA512 = SHA512;
-        Cell.SHA3 = SHA3;
+        Cell.registerComponent("SHA1", SHA1);
+        Cell.registerComponent("SHA224", SHA224);
+        Cell.registerComponent("SHA256", SHA256);
+        Cell.registerComponent("SHA384", SHA384);
+        Cell.registerComponent("SHA512", SHA512);
+        Cell.registerComponent("SHA3", SHA3);
+    } else {
+        window.SHA1 = SHA1;
+        window.SHA224 = SHA224;
+        window.SHA256 = SHA256;
+        window.SHA384 = SHA384;
+        window.SHA512 = SHA512;
+        window.SHA3 = SHA3;
     }
 })();

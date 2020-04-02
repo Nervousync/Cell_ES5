@@ -1,0 +1,17 @@
+{
+  "Multi.Bundle.Type" : "Type of bundle name must be string",
+  "Multi.Resource.Override" : "Override resource key: {0}",
+  "Element.Null.ID" : "Can't found target element, Element ID: {0}",
+  "Element.Null.Name" : "Can't found target element, Element Name: {0}",
+  "Element.Name.String" : "Name of target element must be a string",
+  "Data.Invalid.JSON" : "Parse JSON error，given string was not a valid JSON string",
+  "Data.Invalid.XML" : "Parse XML error, given string was not a valid XML string",
+  "Location.GPS.Unknown" : "GPS Data Invalid",
+  "HttpClient.Status.Code" : "Response Status Code：{0}",
+  "HttpClient.Redirect" : "Redirect Path：{0}",
+  "HttpClient.Request" : "Generate XMLHttpRequest Instance Failed",
+  "Template.Unknown" : "Type of template define list invalid.",
+  "Template.Register" : "Register template, name: {0}，url address: {1}",
+  "Template.Exists" : "Override exists template define, template name: {0}",
+  "Template.Not.Exists" : "Template define not found, template name: {0}"
+}

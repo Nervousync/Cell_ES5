@@ -1,0 +1,6 @@
+{
+  "CRC.ALGORITHMS" : "Can't found config by given CRC algorithms name {0}",
+  "CRC.Register" : "Register CRC algorithm，name：{0}，bit：{1}，polynomial：{2}，init：{3}，xorOut：{4}，refIn：{5}，refOut：{6}",
+  "CRC.Exists" : "CRC algorithms name {0} was exists",
+  "CRC.SUPPORTED" : "Supported CRC algorithms ：{0}"
+}

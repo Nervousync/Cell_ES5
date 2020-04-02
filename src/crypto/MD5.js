@@ -175,11 +175,7 @@ MD5.prototype = {
     }
 };
 
-MD5.newInstance = function() {
-    return new MD5();
-};
-
-MD5.HmacMD5 = function(key) {
+MD5.newInstance = function(key) {
     return new MD5(key);
 };
 
@@ -206,6 +202,8 @@ MD5._md5II = function(i, j, k, x, y) {
 
 (function() {
     if (typeof Cell !== "undefined") {
-        Cell.MD5 = MD5;
+        Cell.registerComponent("MD5", MD5);
+    } else {
+        window.MD5 = MD5;
     }
 })();

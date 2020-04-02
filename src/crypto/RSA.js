@@ -182,7 +182,9 @@ RSA.prototype = {
 
 (function () {
     if (typeof Cell !== "undefined") {
-        Cell.RSA = RSA;
+        Cell.registerComponent("RSA", RSA);
+    } else {
+        window.RSA = RSA;
     }
 })();
 

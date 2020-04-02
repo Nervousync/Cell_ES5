@@ -1,0 +1,17 @@
+{
+  "Multi.Bundle.Type" : "包的名称必须为字符串",
+  "Multi.Resource.Override" : "覆盖已存在的多语言信息：{0}",
+  "Element.Null.ID" : "无法找到对象，标识ID：{0}",
+  "Element.Null.Name" : "无法找到对象，标识名称：{0}",
+  "Element.Name.String" : "指定的对象名称必须为字符串",
+  "Data.Invalid.JSON" : "解析JSON字符串错误，这不是一个正确的JSON字符串",
+  "Data.Invalid.XML" : "解析XML字符串错误，不是一个正确的XML字符串",
+  "Location.GPS.Unknown" : "GPS数据错误",
+  "HttpClient.Status.Code" : "请求状态代码为：{0}",
+  "HttpClient.Redirect" : "请求跳转地址为：{0}",
+  "HttpClient.Request" : "无法生成XMLHttpRequest对象",
+  "Template.Unknown" : "读取到的模板注册列表格式不正确",
+  "Template.Register" : "注册模板名称：{0}，读取地址：{1}",
+  "Template.Exists" : "覆盖已存在的模板信息，模板名称：{0}",
+  "Template.Not.Exists" : "模板未找到，模板名称：{0}"
+}

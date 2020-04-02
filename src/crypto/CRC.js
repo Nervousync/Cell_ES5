@@ -124,10 +124,12 @@ CRC.REGISTER = function(name, bit, polynomial, init, xorOut, refIn, refOut, over
         override = false;
     }
     if (CRC_CONSTANT.hasOwnProperty(name) && !override) {
-        console.log(Cell.message("CRC", "CRC.Exists", name));
+        if (typeof Cell !== "undefined") {
+            console.log(Cell.message("CRC", "CRC.Exists", name));
+        }
         return;
     }
-    if (Cell.developmentMode()) {
+    if ((typeof Cell) !== "undefined" && Cell.developmentMode()) {
         console.log(Cell.message("CRC", "CRC.Register", name, bit, polynomial, init, xorOut, refIn, refOut));
     }
     CRC_CONSTANT[name] = [bit, polynomial, init, xorOut, refIn, refOut];
@@ -159,20 +161,11 @@ CRC._REVERSE_BIT = function(value, bitWidth) {
 };
 
 (function() {
-    Cell.registerResources("CRC", {
-        "zh" : {
-            "CRC.ALGORITHMS" : "无法找到CRC算法{0}对应的配置参数",
-            "CRC.Register" : "注册CRC算法，名称：{0}，位数：{1}，多项式：{2}，初始值：{3}，结果异或值：{4}，输入反转：{5}，输出反转：{6}",
-            "CRC.Exists" : "CRC算法{0}配置已存在",
-            "CRC.SUPPORTED" : "已支持的CRC算法：{0}"
-        },
-        "en" : {
-            "CRC.ALGORITHMS" : "Can't found config by given CRC algorithms name {0}",
-            "CRC.Register" : "Register CRC algorithm，name：{0}，bit：{1}，polynomial：{2}，init：{3}，xorOut：{4}，refIn：{5}，refOut：{6}",
-            "CRC.Exists" : "CRC algorithms name {0} was exists",
-            "CRC.SUPPORTED" : "Supported CRC algorithms ：{0}"
-        }
-    });
+    if (typeof Cell !== "undefined") {
+        Cell.registerComponent("CRC", CRC, true);
+    } else {
+        window.CRC = CRC;
+    }
 
     CRC.REGISTER("CRC-3/GSM", 3, 0x3, 0x0, 0x7, false, false);
     CRC.REGISTER("CRC-3/ROHC", 3, 0x3, 0x7, 0x0, true, true);
@@ -276,12 +269,7 @@ CRC._REVERSE_BIT = function(value, bitWidth) {
     CRC.REGISTER("CRC-32/MPEG-2", 32, 0x04C11DB7, 0xFFFFFFFF, 0x00000000, false, false);
     CRC.REGISTER("CRC-32/XFER", 32, 0x000000AF, 0x00000000, 0x00000000, false, false);
 
-    if (typeof Cell !== "undefined") {
-        Cell.CRC = CRC;
-        if (Cell.developmentMode()) {
-            console.log(Cell.message("CRC", "CRC.SUPPORTED", CRC.REGISTERED_ALGORITHMS()));
-        }
-    } else {
-        console.log(Cell.message("CRC", "CRC.SUPPORTED", CRC.REGISTERED_ALGORITHMS()));
+    if (Cell && Cell.developmentMode()) {
+        console.log(Cell.message("CRC", "CRC.SUPPORTED", Cell.CRC.REGISTERED_ALGORITHMS()));
     }
 })();

@@ -84,10 +84,6 @@ HttpClient._parseResponse = function(_request, _options) {
         _options.onFinished(_request);
     }
 
-    if (Cell.developmentMode()) {
-        console.log(Cell.message("Core", "HttpClient.Status.Code", _request.status));
-    }
-
     if (_request.status === 200) {
         if (_options.onComplete) {
             return _options.onComplete(_request);
@@ -101,9 +97,6 @@ HttpClient._parseResponse = function(_request, _options) {
         }
     } else if (_request.status === 301 || _request.status === 302 || _request.status === 307) {
         var _redirectPath = _request.getResponseHeader("Location");
-        if (Cell.developmentMode()) {
-            console.log(Cell.message("Core", "HttpClient.Redirect", _redirectPath));
-        }
         if (_redirectPath.length !== 0) {
             var _newOption = {};
             Object.extend(_newOption, _options || {});
@@ -127,13 +120,8 @@ HttpClient._initialize = function(url, _options) {
             // Create XMLHttpRequest object by instance an ActiveXObject
             _request = new ActiveXObject("Microsoft.XMLHTTP"); // higher than msxml3
         } catch (e) {
-            try {
-                // Create XMLHttpRequest object by instance an ActiveXObject
-                _request = new ActiveXObject("Msxml2.XMLHTTP"); // lower than msxml3
-            } catch (e) {
-                console.error(Cell.message("Core", "HttpClient.Request"));
-                throw e;
-            }
+            // Create XMLHttpRequest object by instance an ActiveXObject
+            _request = new ActiveXObject("Msxml2.XMLHTTP"); // lower than msxml3
         }
     }
 
@@ -173,15 +161,24 @@ CellJS.prototype = {
     constructor : function() {
         this._config = {
             developmentMode: false,
-            //  Current language
-            language : Comment.Language,
+            //  Internationalization
+            i18n : {
+                //  Current language
+                language : Comment.Language,
+                resPath : ""
+            },
             //  Template Config
             templates : "",
+            darkMode : {
+                enabled : false,
+                styleClass : "darkMode"
+            },
             form : {
                 encryptPassword : true,
                 //  Form password encrypt method
-                //  Options:    MD5/RSA/SHA1/SHA224/SHA256/SHA384/SHA512/SHA3_224/SHA3_256/SHA3_384/SHA3_512
-                //              SHAKE128/SHAKE256/Keccak224/Keccak256/Keccak384/Keccak512
+                //  Options:    MD5/RSA/SHA1/SHA224/SHA256/SHA384/SHA512/SHA512_224/SHA512_256
+                //              SHA3_224/SHA3_256/SHA3_384/SHA3_512/SHAKE128/SHAKE256
+                //              Keccak224/Keccak256/Keccak384/Keccak512
                 encryptMethod : "MD5",
                 convertDateTime : false
             },
@@ -210,6 +207,8 @@ CellJS.prototype = {
         }
         this._resources = {};
         this._templates = {};
+        this._components = {"Core" : true};
+        this.language(this._config.i18n.language);
         if (((typeof this._config.templates) === 'string') && this._config.templates.length > 0) {
             new HttpClient(this._config.templates, {
                 onComplete : function(_request) {
@@ -242,6 +241,13 @@ CellJS.prototype = {
                 }
             }).send();
         }
+
+        if (this._config.darkMode.enabled && Comment.GPS) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                Cell.registerDarkMode(position.coords.longitude, position.coords.latitude);
+            });
+        }
+        this._darkMode = false;
     },
 
     developmentMode : function() {
@@ -286,19 +292,39 @@ CellJS.prototype = {
         return this._config.uploadEvent;
     },
 
-    registerResources : function(bundle, resources) {
-        if ((typeof bundle) !== "string") {
-            throw new Error(Cell.message("Core", "Multi.Bundle.Type"));
-        }
-        resources = resources ? resources : {};
-        for (var language in resources) {
-            if (resources.hasOwnProperty(language)) {
-                var _resourceKey = this._resourceKey(bundle, language);
-                if (this._resources.hasOwnProperty(_resourceKey)) {
-                    console.log(Cell.message("Core", "Multi.Resource.Override", _resourceKey));
-                }
-                this._resources[_resourceKey] = resources[language];
+    registerDarkMode : function(posLon, posLat) {
+        if (this._config.darkMode.enabled) {
+            var Sun = new Date().sunTime(posLon, posLat);
+            if (Sun.SunRise === -1 || Sun.SunSet === -1) {
+                return;
             }
+            this._sunRise = Sun.SunRise;
+            this._sunSet = Sun.SunSet;
+            this.switchDarkMode();
+            setInterval(function() {
+                Cell.switchDarkMode();
+            }, 60 * 1000);
+        }
+    },
+
+    switchDarkMode : function() {
+        if (this._config.darkMode.enabled) {
+            var _currDate = new Date(), _currTime = _currDate.getTime() + (_currDate.getTimezoneOffset() * 60 * 1000);
+            if (_currTime > this._sunRise && this._darkMode) {
+                document.body.removeClass(this._config.darkMode.styleClass);
+            } else if (_currTime > this._sunSet && !this._darkMode) {
+                document.body.appendClass(this._config.darkMode.styleClass);
+            }
+        }
+    },
+
+    registerComponent : function(bundle, component, loadResource) {
+        if (!this._components.hasOwnProperty(bundle)) {
+            this[bundle] = component;
+            if ((typeof loadResource) === "boolean" && loadResource) {
+                this.loadResource(bundle);
+            }
+            this._components[bundle] = loadResource;
         }
     },
 
@@ -346,29 +372,46 @@ CellJS.prototype = {
         document.body.style.overflow = "auto";
     },
 
+    loadResource : function(bundle) {
+        var _url = this._config.i18n.resPath;
+        _url += this._config.i18n.resPath.endsWith("/") ? "" : "/";
+        _url += bundle + "/" + this._config.i18n.language + ".json";
+        this._resources[bundle] = new HttpClient(_url, {
+            asynchronous: false,
+            onComplete : function (_request) {
+                var _responseText = _request.responseText;
+                return _responseText.isJSON ? _responseText.parseJSON() : {};
+            },
+            onError : function (_request) {
+                return {};
+            }
+        }).send();
+    },
+
     message : function(bundle, key) {
-        var _resourceKey = this._resourceKey(bundle, this._config.language);
-        if (this._resources.hasOwnProperty(_resourceKey)) {
-            if (this._resources[_resourceKey].hasOwnProperty(key)) {
-                var _resource = this._resources[_resourceKey][key], _length = arguments.length - 2;
+        if ((typeof bundle) !== "string") {
+            throw new Error(Cell.message("Core", "Multi.Bundle.Type"));
+        }
+        if (this._resources.hasOwnProperty(bundle)) {
+            if (this._resources[bundle].hasOwnProperty(key)) {
+                var _resource = this._resources[bundle][key], _length = arguments.length - 2;
                 for (var i = 0 ; i < _length ; i++) {
                     _resource = _resource.replace("{" + i + "}", arguments[i + 2]);
                 }
                 return _resource;
             }
         }
-        return _resourceKey + "." + key;
+        return bundle + "." + key;
     },
 
     language : function(language) {
-        this._config.language = language;
-    },
-
-    _resourceKey : function(bundle, language) {
-        if (typeof bundle === "string" && bundle.length > 0) {
-            return bundle + "_" + language;
+        this._config.i18n.language = language;
+        this._resources = {};
+        for (var bundle in this._components) {
+            if (this._components[bundle]) {
+                this.loadResource(bundle);
+            }
         }
-        throw new Error(Cell.message("Core", "Multi.Bundle.Type"));
     },
 
     encryptPassword : function(password) {
@@ -378,60 +421,74 @@ CellJS.prototype = {
         if (this._config.form.encryptMethod === "RSA" && this._rsa !== null) {
             return this._rsa.encrypt(password);
         }
+        return this.calculateData(this._config.form.encryptMethod, password);
+    },
+
+    calculateData : function(method, data, key) {
         var encryptor;
-        switch (this._config.form.encryptMethod) {
-            case "MD5":
-                encryptor = Cell.MD5.newInstance();
-                break;
-            case "SHA1":
-                encryptor = Cell.SHA1.newInstance();
-                break;
-            case "SHA224":
-                encryptor = Cell.SHA224.newInstance();
-                break;
-            case "SHA256":
-                encryptor = Cell.SHA256.newInstance();
-                break;
-            case "SHA384":
-                encryptor = Cell.SHA384.newInstance();
-                break;
-            case "SHA512":
-                encryptor = Cell.SHA512.newInstance();
-                break;
-            case "SHA3_224":
-                encryptor = Cell.SHA3.SHA3_224();
-                break;
-            case "SHA3_256":
-                encryptor = Cell.SHA3.SHA3_256();
-                break;
-            case "SHA3_384":
-                encryptor = Cell.SHA3.SHA3_384();
-                break;
-            case "SHA3_512":
-                encryptor = Cell.SHA3.SHA3_512();
-                break;
-            case "SHAKE128":
-                encryptor = Cell.SHA3.SHAKE128();
-                break;
-            case "SHAKE256":
-                encryptor = Cell.SHA3.SHAKE256();
-                break;
-            case "Keccak224":
-                encryptor = Cell.SHA3.Keccak224();
-                break;
-            case "Keccak256":
-                encryptor = Cell.SHA3.Keccak256();
-                break;
-            case "Keccak384":
-                encryptor = Cell.SHA3.Keccak384();
-                break;
-            case "Keccak512":
-                encryptor = Cell.SHA3.Keccak512();
-                break;
-            default:
-                return password;
+        if (method.startsWith("CRC")) {
+            encryptor = Cell.CRC.newInstance(method);
+        } else {
+            switch (method) {
+                case "MD5":
+                    encryptor = Cell.MD5.newInstance(key);
+                    break;
+                case "SHA1":
+                    encryptor = Cell.SHA1.newInstance(key);
+                    break;
+                case "SHA224":
+                    encryptor = Cell.SHA224.newInstance(key);
+                    break;
+                case "SHA256":
+                    encryptor = Cell.SHA256.newInstance(key);
+                    break;
+                case "SHA384":
+                    encryptor = Cell.SHA384.newInstance(key);
+                    break;
+                case "SHA512":
+                    encryptor = Cell.SHA512.newInstance(key);
+                    break;
+                case "SHA512_224":
+                    encryptor = Cell.SHA512.SHA512_224(key);
+                    break;
+                case "SHA512_256":
+                    encryptor = Cell.SHA512.SHA512_256(key);
+                    break;
+                case "SHA3_224":
+                    encryptor = Cell.SHA3.SHA3_224(key);
+                    break;
+                case "SHA3_256":
+                    encryptor = Cell.SHA3.SHA3_256(key);
+                    break;
+                case "SHA3_384":
+                    encryptor = Cell.SHA3.SHA3_384(key);
+                    break;
+                case "SHA3_512":
+                    encryptor = Cell.SHA3.SHA3_512(key);
+                    break;
+                case "SHAKE128":
+                    encryptor = Cell.SHA3.SHAKE128();
+                    break;
+                case "SHAKE256":
+                    encryptor = Cell.SHA3.SHAKE256();
+                    break;
+                case "Keccak224":
+                    encryptor = Cell.SHA3.Keccak224(key);
+                    break;
+                case "Keccak256":
+                    encryptor = Cell.SHA3.Keccak256(key);
+                    break;
+                case "Keccak384":
+                    encryptor = Cell.SHA3.Keccak384(key);
+                    break;
+                case "Keccak512":
+                    encryptor = Cell.SHA3.Keccak512(key);
+                    break;
+                default:
+                    return data;
+            }
         }
-        encryptor.append(password);
+        encryptor.append(data);
         return encryptor.finish();
     },
 
@@ -458,16 +515,6 @@ CellJS.prototype = {
                             throw new Error(Cell.message("Core", "Data.Invalid.JSON"));
                         }
                         var _jsonData = data.parseJSON();
-                        if (this.dataset.floatWindow) {
-                            Cell.coverWindow();
-                            this.show();
-                            if (_jsonData["timeout"] && _jsonData["timeout"].isNum()) {
-                                setTimeout(function() {
-                                    this.hide();
-                                    Cell.closeCover();
-                                }, parseInt(_jsonData["timeout"]));
-                            }
-                        }
                         if (this.tagName.toLowerCase() === "form") {
                             var _inputList = this.querySelectorAll("input, select, datalist"),
                                 _inputLength = _inputList.length, j, input;
@@ -508,7 +555,7 @@ CellJS.prototype = {
                                         return null;
                                     }
                                 }).send();
-                                if (content != null) {
+                                if (content != null && content.isHtml()) {
                                     _template.content = content.parseXml().documentElement;
                                     Cell._templates[this.dataset.template] = _template;
                                 }
@@ -519,22 +566,56 @@ CellJS.prototype = {
                             Render.processRender(this, _jsonData, (this.dataset.override === "true"), _template.content);
                         }
                         Cell.processOnload();
+                        if (_jsonData["title"] !== null) {
+                            _jsonData["title"].setTitle();
+                        }
+                        if (_jsonData["keywords"] !== null) {
+                            _jsonData["keywords"].setKeywords();
+                        }
+                        if (_jsonData["description"] !== null) {
+                            _jsonData["description"].setDescription();
+                        }
+                        if (this.dataset.floatWindow) {
+                            Cell.coverWindow();
+                            this.show();
+                            if (_jsonData["timeout"] && _jsonData["timeout"].isNum()) {
+                                setTimeout(function() {
+                                    this.hide();
+                                    Cell.closeCover();
+                                }, parseInt(_jsonData["timeout"]));
+                            }
+                        }
                     }
                 });
                 element.dataset.bindProcessed = "true";
             }
         }
-        _elementList = document.querySelectorAll("*[data-float-window='true']");
-        _length = _elementList.length;
-        for (i = 0 ; i < _length ; i++) {
-            _elementList[i].hide();
-        }
-        _elementList = document.querySelectorAll("*[data-disabled='true']");
+        _elementList = document.querySelectorAll("*[data-float-window='true'], *[data-disabled='true'], *[href][data-element-id], a[data-form-id], button[data-form-id], input[data-validate='true']");
         _length = _elementList.length;
         for (i = 0 ; i < _length ; i++) {
             element = _elementList[i];
-            if (element.dataset.activeDelay && element.dataset.activeDelay.isNum()) {
+            var tagName = element.tagName.toLowerCase();
+            if (element.dataset.floatWindow === "true") {
+                element.hide();
+            }
+            if (element.dataset.disabled === "true" && element.dataset.activeDelay
+                && element.dataset.activeDelay.isNum()) {
                 setTimeout(Cell.enableElement(element), element.dataset.activeDelay.parseInt());
+            }
+            if (element.dataset.elementId !== null && element.hasAttribute("href")) {
+                element.addEvent("click", function(event) {
+                    Cell.sendRequest(event);
+                })
+            }
+            if ((tagName === "a" || tagName === "button") && element.dataset.formId !== null) {
+                element.addEvent("click", function(event) {
+                    Cell.submitForm(event);
+                })
+            }
+            if ((tagName === "input" || tagName === "select") && element.dataset.validate === "true") {
+                element.addEvent("blur", function(event) {
+                    event.target.validate();
+                })
             }
         }
     },
@@ -586,43 +667,6 @@ CellJS.$ = function() {
     } else {
         window.onload = Cell.processOnload;
     }
-
-    Cell.registerResources("Core", {
-        "zh" : {
-            "Multi.Bundle.Type" : "包的名称必须为字符串",
-            "Multi.Resource.Override" : "覆盖已存在的多语言信息：{0}",
-            "Element.Null.ID" : "无法找到对象，标识ID：{0}",
-            "Element.Null.Name" : "无法找到对象，标识名称：{0}",
-            "Element.Name.String" : "指定的对象名称必须为字符串",
-            "Data.Invalid.JSON" : "解析JSON字符串错误，这不是一个正确的JSON字符串",
-            "Data.Invalid.XML" : "解析XML字符串错误，不是一个正确的XML字符串",
-            "Location.GPS.Unknown" : "GPS数据错误",
-            "HttpClient.Status.Code" : "请求状态代码为：{0}",
-            "HttpClient.Redirect" : "请求跳转地址为：{0}",
-            "HttpClient.Request" : "无法生成XMLHttpRequest对象",
-            "Template.Unknown" : "读取到的模板注册列表格式不正确",
-            "Template.Register" : "注册模板名称：{0}，读取地址：{1}",
-            "Template.Exists" : "覆盖已存在的模板信息，模板名称：{0}",
-            "Template.Not.Exists" : "模板未找到，模板名称：{0}"
-        },
-        "en" : {
-            "Multi.Bundle.Type" : "Type of bundle name must be string",
-            "Multi.Resource.Override" : "Override resource key: {0}",
-            "Element.Null.ID" : "Can't found target element, Element ID: {0}",
-            "Element.Null.Name" : "Can't found target element, Element Name: {0}",
-            "Element.Name.String" : "Name of target element must be a string",
-            "Data.Invalid.JSON" : "Parse JSON error，given string was not a valid JSON string",
-            "Data.Invalid.XML" : "Parse XML error, given string was not a valid XML string",
-            "Location.GPS.Unknown" : "GPS Data Invalid",
-            "HttpClient.Status.Code" : "Response Status Code：{0}",
-            "HttpClient.Redirect" : "Redirect Path：{0}",
-            "HttpClient.Request" : "Generate XMLHttpRequest Instance Failed",
-            "Template.Unknown" : "Type of template define list invalid.",
-            "Template.Register" : "Register template, name: {0}，url address: {1}",
-            "Template.Exists" : "Override exists template define, template name: {0}",
-            "Template.Not.Exists" : "Template define not found, template name: {0}"
-        }
-    });
 })();
 
 var Render = Class.create();
