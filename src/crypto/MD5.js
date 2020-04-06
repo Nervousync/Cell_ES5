@@ -47,163 +47,164 @@ var RC_II = [
     0x6FA87E4F, 0xFE2CE6E0, 0xA3014314, 0x4E0811A1, 0xF7537E82, 0xBD3AF235, 0x2AD7D2BB, 0xEB86D391
 ];
 
-var MD5 = Class.create();
-MD5.prototype = {
-    constructor : function(key) {
-        key = key ? key : "";
-        this.reset();
-        if (key.length > 0) {
-            this._inPad = [];
-            this._outPad = [];
-            this._inPad[15] = this._outPad[15] = 0;
-            var _keyBytes = key.getBytes(false);
-            if (_keyBytes.length > 16) {
-                this.append(key);
-                _keyBytes = this.finish(false);
-                this.reset();
-            }
-
-            for (var i = 0 ; i < 16 ; i++) {
-                this._inPad[i] = _keyBytes[i] ^ 0x36363636;
-                this._outPad[i] = _keyBytes[i] ^ 0x5C5C5C5C;
-            }
-            this._calculate(this._inPad);
-            this._length = 64;
-        }
-        this._hmac = key.length > 0;
-    }, 
-
-    append : function(string) {
-        this.appendBinary(string.getBytes(false), string.toUTF8().length);
-    }, 
-    
-    appendBinary : function(dataBytes, dataLength) {
-        this._buffer = this._buffer.concat(dataBytes);
-        this._length += dataLength;
-        this._preCalc();
-    }, 
-    
-    _final : function(dataBytes, length, total) {
-        if (length !== -1) {
-            dataBytes[length >> 2] |= 0x80 << ((length % 4) << 3);
-        }
-        if (total !== -1) {
-            dataBytes[14] = (total & 0xFFFFFFFF);
-            dataBytes[15] = Math.floor(total / 0x100000000);
-        }
-        this._calculate(dataBytes);
-    }, 
-    
-    finish : function(hex) {
-        hex = hex ? hex : true;
-        var _tail = this._buffer.slice();
-        var _length = this._length % 64;
-        if (this._buffer.length > 13) {
-            this._final(_tail, _length, -1);
-            _length = -1;
-            _tail = [];
-        }
-    
-        this._final(_tail, _length, this._length * 8);
-    
-        if (this._hmac) {
-            _tail = this._hash.slice();
-            this.reset();
-            this._calculate(this._outPad);
-            this._final(_tail, 16, this._hmacTotal());
-        }
-        var _result = this._hash.slice();
-        if (hex) {
-            _result = _result.toHex();
-        }
-        this.reset();
-        return _result;
-    }, 
-    
-    reset : function() {
-        this._buffer = [];
-        this._length = 0;
-        this._hash = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
-    }, 
-    
-    _preCalc : function() {
-        while (this._buffer.length > 16) {
-            this._calculate(this._buffer.slice(0, 16));
-            this._buffer = this._buffer.slice(16);
-        }
-    }, 
-    
-    _hmacTotal : function() {
-        return 80 * 8;
-    },
-
-    _calculate : function(_tmp) {
-        var _hash = this._hash.slice();
-    
-        this._md5Cycle(_tmp, 0, 1, MD5._md5FF, RC_FF, [7, 12, 17, 22]);
-        this._md5Cycle(_tmp, 1, 5, MD5._md5GG, RC_GG, [5,  9, 14, 20]);
-        this._md5Cycle(_tmp, 5, 3, MD5._md5HH, RC_HH, [4, 11, 16, 23]);
-        this._md5Cycle(_tmp, 0, 7, MD5._md5II, RC_II, [6, 10, 15, 21], true);
-    
-        this._hash[0] = safeAdd(_hash[0], this._hash[0]);
-        this._hash[1] = safeAdd(_hash[1], this._hash[1]);
-        this._hash[2] = safeAdd(_hash[2], this._hash[2]);
-        this._hash[3] = safeAdd(_hash[3], this._hash[3]);
-    }, 
-    
-    _md5Cycle : function(tmp, begin, step, cycleFunc, rc, r, final) {
-        var hashIndex = (final != null && final) ? HASH_INDEX_FINAL : HASH_INDEX_NORMAL;
-        var _tmpIndex = begin;
-        for (var i = 0 ; i < 16 ; i++) {
-            var _cnt = i % 4;
-            var _index = 4 - _cnt;
-            if (_index === 4) {
-                _index = 0;
-            }
-    
-            this._hash[_index] = MD5._rotateAndAdd(
-                safeAdd(this._hash[_index],
-                    cycleFunc.call(this, this._hash[hashIndex[_cnt][0]], this._hash[hashIndex[_cnt][1]],
-                        this._hash[hashIndex[_cnt][2]], tmp[_tmpIndex], rc[i])),
-                this._hash[hashIndex[_cnt][3]], r[_cnt]);
-    
-            _tmpIndex += step;
-            if (_tmpIndex >= 16) {
-                _tmpIndex -= 16;
-            }
-        }
-    }
-};
-
-MD5.newInstance = function(key) {
-    return new MD5(key);
-};
-
-MD5._rotateAndAdd = function(x, y, _count) {
-    return safeAdd((x ? x : 0).safeRotateLeft(_count), (y ? y : 0));
-};
-
-MD5._md5FF = function(i, j, k, x, y) {
-    return safeAdd((((i ? i : 0) & (j ? j : 0) | ~(i ? i : 0) & (k ? k : 0))), (x ? x : 0) + (y ? y : 0));
-};
-
-MD5._md5GG = function(i, j, k, x, y) {
-    return safeAdd((((i ? i : 0) & (k ? k : 0) | (j ? j : 0) & ~(k ? k : 0))), (x ? x : 0) + (y ? y : 0));
-};
-
-MD5._md5HH = function(i, j, k, x, y) {
-    return safeAdd(((i ? i : 0) ^ (j ? j : 0) ^ (k ? k : 0)), (x ? x : 0) + (y ? y : 0));
-};
-
-MD5._md5II = function(i, j, k, x, y) {
-    return safeAdd((((i ? i : 0) ^ ((j ? j : 0) | ~(k ? k : 0)))), (x ? x : 0) + (y ? y : 0));
-};
-
-
-(function() {
+(function(MD5) {
     if (typeof Cell !== "undefined") {
         Cell.registerComponent("MD5", MD5);
     } else {
         window.MD5 = MD5;
     }
-})();
+})(function () {
+    var MD5 = Class.create();
+    MD5.prototype = {
+        constructor : function(key) {
+            key = key ? key : "";
+            this.reset();
+            if (key.length > 0) {
+                this._inPad = [];
+                this._outPad = [];
+                this._inPad[15] = this._outPad[15] = 0;
+                var _keyBytes = key.getBytes(false);
+                if (_keyBytes.length > 16) {
+                    this.append(key);
+                    _keyBytes = this.finish(false);
+                    this.reset();
+                }
+
+                for (var i = 0 ; i < 16 ; i++) {
+                    this._inPad[i] = _keyBytes[i] ^ 0x36363636;
+                    this._outPad[i] = _keyBytes[i] ^ 0x5C5C5C5C;
+                }
+                this._calculate(this._inPad);
+                this._length = 64;
+            }
+            this._hmac = key.length > 0;
+        },
+
+        append : function(string) {
+            this.appendBinary(string.getBytes(false), string.toUTF8().length);
+        },
+
+        appendBinary : function(dataBytes, dataLength) {
+            this._buffer = this._buffer.concat(dataBytes);
+            this._length += dataLength;
+            this._preCalc();
+        },
+
+        _final : function(dataBytes, length, total) {
+            if (length !== -1) {
+                dataBytes[length >> 2] |= 0x80 << ((length % 4) << 3);
+            }
+            if (total !== -1) {
+                dataBytes[14] = (total & 0xFFFFFFFF);
+                dataBytes[15] = Math.floor(total / 0x100000000);
+            }
+            this._calculate(dataBytes);
+        },
+
+        finish : function(hex) {
+            hex = hex ? hex : true;
+            var _tail = this._buffer.slice();
+            var _length = this._length % 64;
+            if (this._buffer.length > 13) {
+                this._final(_tail, _length, -1);
+                _length = -1;
+                _tail = [];
+            }
+
+            this._final(_tail, _length, this._length * 8);
+
+            if (this._hmac) {
+                _tail = this._hash.slice();
+                this.reset();
+                this._calculate(this._outPad);
+                this._final(_tail, 16, this._hmacTotal());
+            }
+            var _result = this._hash.slice();
+            if (hex) {
+                _result = _result.toHex();
+            }
+            this.reset();
+            return _result;
+        },
+
+        reset : function() {
+            this._buffer = [];
+            this._length = 0;
+            this._hash = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
+        },
+
+        _preCalc : function() {
+            while (this._buffer.length > 16) {
+                this._calculate(this._buffer.slice(0, 16));
+                this._buffer = this._buffer.slice(16);
+            }
+        },
+
+        _hmacTotal : function() {
+            return 80 * 8;
+        },
+
+        _calculate : function(_tmp) {
+            var _hash = this._hash.slice();
+
+            this._md5Cycle(_tmp, 0, 1, MD5._md5FF, RC_FF, [7, 12, 17, 22]);
+            this._md5Cycle(_tmp, 1, 5, MD5._md5GG, RC_GG, [5,  9, 14, 20]);
+            this._md5Cycle(_tmp, 5, 3, MD5._md5HH, RC_HH, [4, 11, 16, 23]);
+            this._md5Cycle(_tmp, 0, 7, MD5._md5II, RC_II, [6, 10, 15, 21], true);
+
+            this._hash[0] = safeAdd(_hash[0], this._hash[0]);
+            this._hash[1] = safeAdd(_hash[1], this._hash[1]);
+            this._hash[2] = safeAdd(_hash[2], this._hash[2]);
+            this._hash[3] = safeAdd(_hash[3], this._hash[3]);
+        },
+
+        _md5Cycle : function(tmp, begin, step, cycleFunc, rc, r, final) {
+            var hashIndex = (final != null && final) ? HASH_INDEX_FINAL : HASH_INDEX_NORMAL;
+            var _tmpIndex = begin;
+            for (var i = 0 ; i < 16 ; i++) {
+                var _cnt = i % 4;
+                var _index = 4 - _cnt;
+                if (_index === 4) {
+                    _index = 0;
+                }
+
+                this._hash[_index] = MD5._rotateAndAdd(
+                    safeAdd(this._hash[_index],
+                        cycleFunc.call(this, this._hash[hashIndex[_cnt][0]], this._hash[hashIndex[_cnt][1]],
+                            this._hash[hashIndex[_cnt][2]], tmp[_tmpIndex], rc[i])),
+                    this._hash[hashIndex[_cnt][3]], r[_cnt]);
+
+                _tmpIndex += step;
+                if (_tmpIndex >= 16) {
+                    _tmpIndex -= 16;
+                }
+            }
+        }
+    };
+
+    MD5.newInstance = function(key) {
+        return new MD5(key);
+    };
+
+    MD5._rotateAndAdd = function(x, y, _count) {
+        return safeAdd((x ? x : 0).safeRotateLeft(_count), (y ? y : 0));
+    };
+
+    MD5._md5FF = function(i, j, k, x, y) {
+        return safeAdd((((i ? i : 0) & (j ? j : 0) | ~(i ? i : 0) & (k ? k : 0))), (x ? x : 0) + (y ? y : 0));
+    };
+
+    MD5._md5GG = function(i, j, k, x, y) {
+        return safeAdd((((i ? i : 0) & (k ? k : 0) | (j ? j : 0) & ~(k ? k : 0))), (x ? x : 0) + (y ? y : 0));
+    };
+
+    MD5._md5HH = function(i, j, k, x, y) {
+        return safeAdd(((i ? i : 0) ^ (j ? j : 0) ^ (k ? k : 0)), (x ? x : 0) + (y ? y : 0));
+    };
+
+    MD5._md5II = function(i, j, k, x, y) {
+        return safeAdd((((i ? i : 0) ^ ((j ? j : 0) | ~(k ? k : 0)))), (x ? x : 0) + (y ? y : 0));
+    };
+
+    return MD5;
+}());

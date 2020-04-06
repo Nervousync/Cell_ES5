@@ -39,13 +39,13 @@ var CHN_SOCIAL_CREDIT_CODE = [
 ];
 
 var Comment = {
-    Version:    "1.0.1",
-    Language:   (navigator.language|| navigator.userLanguage).substring(0, 2),
+    Language:   (navigator.language || navigator.userLanguage).substring(0, 2),
     Html5:      !!window.applicationCache,
     MaxWidth :  Math.max(document.documentElement.scrollWidth, document.documentElement.clientWidth),
     MaxHeight : Math.max(document.documentElement.scrollHeight, document.documentElement.clientHeight),
-    GPS : !!navigator.geolocation,
+    GPS :       !!navigator.geolocation,
     Browser: {
+        Version:	parseInt(navigator.appVersion),
         //	Internet Explorer
         IE:     	!!window.ActiveXObject || "ActiveXObject" in window,
         //	Internet Explorer Under Version 8
@@ -67,8 +67,7 @@ var Comment = {
         //	Apple Safari and Google Chrome
         WebKit: 	navigator.userAgent.indexOf('AppleWebKit/') > -1,
         //	Mozilla Firefox, Apple Safari and Google Chrome
-        Gecko:  	navigator.userAgent.indexOf('Gecko') > -1 && navigator.userAgent.indexOf('KHTML') === -1,
-        Version:	parseInt(navigator.appVersion)
+        Gecko:  	navigator.userAgent.indexOf('Gecko') > -1 && navigator.userAgent.indexOf('KHTML') === -1
     },
     HtmlTag : [
         "a", "abbr", "acronym", "address", "appvar", "area", "b", "base", "bdo", "big", "blockquote", "body", "br", "button", "caption", "center", "cite",
@@ -104,6 +103,60 @@ var RegexLibrary = {
     CHN_Social_Credit : /^([1-9]|A|N|Y)[0-9A-Z]{17}$/g
 };
 
+var Config = {
+    developmentMode: false,
+    templates : "",
+    components : "",
+    //  Internationalization
+    i18n : {
+        //  Current language
+        language : Comment.Language,
+        resPath : ""
+    },
+    //  Config the dark mode by sunrise and sunset
+    darkMode : {
+        enabled : false,
+        styleClass : "darkMode"
+    },
+    //  Config for form data
+    form : {
+        //  Encrypt value of input[type='password']
+        encryptPassword : true,
+        //  Encrypt method for input[type='password']
+        //  Options:    MD5/RSA/SHA1/SHA224/SHA256/SHA384/SHA512/SHA512_224/SHA512_256
+        //              SHA3_224/SHA3_256/SHA3_384/SHA3_512/SHAKE128/SHAKE256
+        //              Keccak224/Keccak256/Keccak384/Keccak512
+        encryptMethod : "MD5",
+        //  Convert date/time from 'yyyy-MM-dd [HH:mm]' to number of milliseconds between that date and midnight, January 1, 1970.
+        convertDateTime : false,
+        //  Convert value is UTC number of milliseconds between that date and midnight, January 1, 1970.
+        utcDateTime : false
+    },
+    security : {
+        //  RSA Key Config
+        RSA : {
+            //  Private Key using for encrypt send data and generate digital signature
+            PrivateKey : {
+                exponent : "",
+                modulus : "",
+                //  Exponent and modulus data radix, default is 16
+                radix : 16,
+                //  Private Key Size
+                keySize : 1024
+            },
+            //  Public Key using for decrypt receive data and verify digital signature
+            PublicKey : {
+                exponent : "",
+                modulus : "",
+                //  Exponent and modulus data radix, default is 16
+                radix : 16,
+                //  Public Key Size
+                keySize : 1024
+            }
+        }
+    }
+};
+
 Object.extend = function(destination, source) {
     for (var _property in source) {
         if (source.hasOwnProperty(_property)
@@ -133,6 +186,9 @@ Object.extend(Element.prototype, {
     },
 
     hasClass : function(_className) {
+        if (_className === undefined) {
+            return true;
+        }
         if (Comment.Html5) {
             return this.classList.contains(_className);
         }
@@ -144,27 +200,31 @@ Object.extend(Element.prototype, {
     },
 
     appendClass : function(_className) {
-        if (Comment.Html5) {
-            this.classList.add(_className);
-        } else {
-            if (_className && !this.hasClass(_className)) {
-                this.setClass(this.getClass() + " " + _className);
+        if (_className !== undefined) {
+            if (Comment.Html5) {
+                this.classList.add(_className);
+            } else {
+                if (_className && !this.hasClass(_className)) {
+                    this.setClass(this.getClass() + " " + _className);
+                }
             }
         }
     },
 
     removeClass : function(_className) {
-        if (Comment.Html5) {
-            this.classList.remove(_className);
-        } else {
-            if (_className && this.hasClass(_className)) {
-                this.setClass(this.getClass().replace(_className, ""));
+        if (_className !== undefined) {
+            if (Comment.Html5) {
+                this.classList.remove(_className);
+            } else {
+                if (_className && this.hasClass(_className)) {
+                    this.setClass(this.getClass().replace(_className, ""));
+                }
             }
         }
     },
 
     setClass : function(_className) {
-        if (_className !== null) {
+        if (_className !== undefined) {
             _className = _className.replace(RegexLibrary.BlankText, " ").trim();
             if (Comment.Browser.IE8) {
                 this.setAttribute("className", _className);
@@ -860,7 +920,7 @@ Object.extend(Array.prototype, {
         for (var i = 0 ; i < this.length ; i++) {
             _byte = this[i];
             for (var j = 0 ; j < 4 ; j++) {
-                if (littleEndian === null || littleEndian) {
+                if (littleEndian === undefined || littleEndian) {
                     _result += BASE16[(_byte >> ((2 * j + 1) * 4)) & 0x0F] + BASE16[(_byte >> ((2 * j) * 4)) & 0x0F];
                 } else {
                     _result += BASE16[(_byte >> (28 - ((2 * j) * 4))) & 0x0F] + BASE16[(_byte >> (28 - ((2 * j + 1) * 4))) & 0x0F];
@@ -882,7 +942,7 @@ Object.extend(Array.prototype, {
             }
         }
         while (_result.length % 4 !== 0) {
-            _result += ((padding !== null) ? padding : BASE64[64]);
+            _result += ((padding !== undefined) ? padding : BASE64[64]);
         }
 
         return _result;
